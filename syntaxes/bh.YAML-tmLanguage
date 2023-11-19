@@ -1,0 +1,1740 @@
+fileTypes:
+    - bs
+keyEquivalent: ^~H
+name: bh
+patterns:
+  - include: '#comment_like'
+  - include: '#numeric_literals'
+  - include: '#string_literal'
+  - include: '#char_literal'
+  - match: '(?<!@|#)-\}'
+    name: invalid
+  - match: '(\()\s*(\))'
+    name: constant.language.unit.bh
+    captures:
+      '1': {name: punctuation.paren.bh}
+      '2': {name: punctuation.paren.bh}
+  - match: '(\()(#)\s*(#)(\))'
+    name: constant.language.unit.unboxed.bh
+    captures:
+      '1': {name: punctuation.paren.bh}
+      '2': {name: keyword.operator.hash.bh}
+      '3': {name: keyword.operator.hash.bh}
+      '4': {name: punctuation.paren.bh}
+  - match: '(\()\s*,[\s,]*(\))'
+    name: support.constant.tuple.bh
+    captures:
+      '1': {name: punctuation.paren.bh}
+      '2': {name: punctuation.paren.bh}
+  - match: '(\()(#)\s*,[\s,]*(#)(\))'
+    name: support.constant.tuple.unboxed.bh
+    captures:
+      '1': {name: punctuation.paren.bh}
+      '2': {name: keyword.operator.hash.bh}
+      '3': {name: keyword.operator.hash.bh}
+      '4': {name: punctuation.paren.bh}
+  - match: '(\[)\s*(\])'
+    name: constant.language.empty-list.bh
+    captures:
+      '1': {name: punctuation.bracket.bh}
+      '2': {name: punctuation.bracket.bh}
+  - begin: '(\b(?<!'')(package)|^(signature))(\b(?!''))'
+    beginCaptures:
+      '2': {name: keyword.other.package.bh}
+      '3': {name: keyword.other.signature.bh}
+    end: '(?=\b(?<!'')where\b(?!''))'
+    name: meta.declaration.package.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#package_name'
+      - include: '#package_exports'
+      - match: '[a-z]+'
+        name: invalid
+  - include: '#ffi'
+  - begin: '^(\s*)(class)(\s*coherent)?(\b(?!''))'
+    beginCaptures:
+      '2': {name: keyword.other.class.bh}
+    end: >-
+      (?x) # Detect end of class declaration:
+               # 'where' keyword
+         (?=(?<!')\bwhere\b(?!'))  
+               # Decreasing indentation
+         |(?=\}|;)      # Explicit indentation
+         |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+             \1\s+\S    # - more indented, or
+           | \s*        # - starts with whitespace, followed by:
+             (?: $      #   - the end of the line (i.e. empty line), or
+             |\{-[^@]   #   - the start of a block comment, or
+             |--+       #   - the start of a single-line comment.
+                (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                        # The double dash may not be followed by other operator characters
+                        # (then it would be an operator, not a comment)
+           )
+    name: meta.declaration.class.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#where'
+      - include: '#type_signature'
+  # GADT declaration
+  # must find `where` keyword on the same line
+  # (only way to distinguish between GADT and ADT)
+  - begin: >-
+      (?x)
+        ^(\s*)(data|newtype)(?:\s+(instance))?\s+
+        # Keep consuming characters until:
+        ((?:(?!
+        # the equals symbol or the start of a single-line comment, or
+          (?: 
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+            (?:=|--+)
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+          )
+        # the "where" or "deriving" keywords, or
+        | (?:\b(?<!')(?:where|deriving)\b(?!'))
+        # the start of a block comment.
+        | {-
+        #
+        ).)*)
+        (?=\b(?<!'')where\b(?!''))
+    beginCaptures:
+      '2': {name: keyword.other.$2.bh}
+      '3': {name: keyword.other.instance.bh}
+      '4': 
+        patterns:
+          - include: '#type_signature'
+    name: meta.declaration.$2.generalized.bh
+    end: | 
+      (?x) # Detect end of data declaration:
+               # Deriving clause
+         (?=(?<!')\bderiving\b(?!'))  
+               # Decreasing indentation
+         |(?=\}|;)      # Explicit indentation
+         |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+             \1\s+\S    # - more indented, or
+           | \s*        # - starts with whitespace, followed by:
+             (?: $      #   - the end of the line (i.e. empty line), or
+             |\{-[^@]   #   - the start of a block comment, or
+             |--+       #   - the start of a single-line comment.
+                (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                        # The double dash may not be followed by other operator characters
+                        # (then it would be an operator, not a comment)
+           )
+    patterns:
+      - include: '#comment_like'
+      # Can't simply include 'where' pattern,
+      # because it includes all of $self,
+      # whereas we want something slightly different
+      - begin: >-
+          (?x)
+            (?<!')\b(where)
+            \s*(\{)(?!-)
+        end: '\}'
+        beginCaptures:
+          '1': {name: keyword.other.where.bh}
+          '2': {name: punctuation.brace.bh}
+        endCaptures:
+          '1': {name: punctuation.brace.bh}
+        patterns:
+          - include: '#comment_like'
+          - include: '#gadt_constructor'
+          - match: ';'
+            name: punctuation.semicolon.bh
+      - match: '\b(?<!'')(where)\b(?!'')'
+        name: keyword.other.where.bh
+      - include: '#deriving'
+      - include: '#gadt_constructor'
+  - include: '#role_annotation'
+  - name: 'meta.declaration.pattern.type.bh'
+    begin: '^(\s*)(pattern)\s+(.*?)\s+(::|∷)(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])'
+    beginCaptures:
+      '2': {name: keyword.other.pattern.bh}
+      '3':
+        patterns:
+          - include: '#comma'
+          - include: '#data_constructor'
+      '4': {name: keyword.operator.double-colon.bh}
+    end: | 
+      (?x) # Detect end of pattern type definition by decreasing indentation:
+        (?=\}|;)       # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    patterns:
+      - include: '#type_signature'
+  - name: 'meta.declaration.pattern.bh'
+    begin: '^\s*(pattern)\b(?!'')'
+    captures:
+      '1': {name: keyword.other.pattern.bh}
+    end: | 
+      (?x) # Detect end of pattern type definition by decreasing indentation:
+        (?=\}|;)       # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    patterns:
+      - include: '$self'
+  # ADT declaration (no "where" keyword on the same line)
+  - begin: >-
+      (?x)
+        # Data declaration
+        ^(\s*)(data|newtype)(?:\s+(family|instance))?\s+
+        # Keep consuming characters until:
+        (((?!
+        # the equals symbol or the start of a single-line comment, or
+          (?: 
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+            (?:=|--+)
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+          )
+        # the "where" or "deriving" keywords, or
+        | (?:\b(?<!')(?:where|deriving)\b(?!'))
+        # the start of a block comment.
+        | {-
+        #
+        ).)*)
+    beginCaptures:
+      '2': {name: keyword.other.$2.bh}
+      '3': {name: keyword.other.$3.bh}
+      '4':
+        patterns:
+          - include: '#type_signature'
+    name: meta.declaration.$2.algebraic.bh
+    end: >-
+      (?x) # Detect end of data declaration: 
+           # Decreasing indentation
+         (?=\}|;)      # Explicit indentation
+         |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+             \1\s+\S    # - more indented, or
+           | \s*        # - starts with whitespace, followed by:
+             (?: $      #   - the end of the line (i.e. empty line), or
+             |\{-[^@]   #   - the start of a block comment, or
+             |--+       #   - the start of a single-line comment.
+                (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                        # The double dash may not be followed by other operator characters
+                        # (then it would be an operator, not a comment)
+           )
+    patterns:
+      - include: '#comment_like'
+      - include: '#deriving'
+      - include: '#forall'
+      - include: '#adt_constructor'
+      - include: '#data_context'
+      - include: '#record_decl'
+      - include: '#type_signature'
+  - name: 'meta.declaration.type.family.bh'
+    begin: >-
+      (?x)
+        # Type family
+        ^(\s*)(type)\s+(family)\b(?!')
+        # Keep consuming characters until:
+        (((?!
+        # the equals symbol or the start of a single-line comment, or
+          (?: 
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+            (?:=|--+)
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+          )
+        # the "where" keyword, or
+        | \b(?<!')where\b(?!')
+        # the start of a block comment.
+        | {-
+        #
+        ).)*)
+    beginCaptures:
+      '2': {name: keyword.other.type.bh}
+      '3': {name: keyword.other.family.bh}
+      '4':
+        patterns:
+          - include: "#comment_like"
+          - include: '#where'
+          - include: '#type_signature'
+    end: | 
+      (?x) # Detect end of type family by decreasing indentation:
+        (?=\}|;)       # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    patterns:
+      - include: "#comment_like"
+      - include: '#where'
+      - include: '#type_signature'
+  - name: 'meta.declaration.type.bh'
+    begin: >-
+      (?x)
+        # Type declaration
+        ^(\s*)(type)(?:\s+(instance))?\s+
+        # Keep consuming characters until:
+        (((?!
+        # the equals symbol, the start of a single-line comment, or a type signature
+          (?: 
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+            (?:=|--+|::|∷)
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+          )
+        # the start of a block comment.
+        | {-
+        #
+        ).)*)
+    beginCaptures:
+      '2': {name: keyword.other.type.bh}
+      '3': {name: keyword.other.instance.bh}
+      '4':
+        patterns:
+          - include: '#type_signature'
+    end: |
+      (?x) # Detect end of type definition by decreasing indentation:
+        (?=\}|;)       # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    patterns:
+      - include: '#type_signature'
+  - begin: '^(\s*)(instance)(\b(?!''))'
+    beginCaptures:
+      '2': {name: keyword.other.instance.bh}
+    end: |
+      (?x) # Detect end of instance declaration:
+        # 'where' keyword
+        (?=\b(?<!')(where)\b(?!'))
+        # Decreasing indentation
+        |(?=\}|;)      # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    name: meta.declaration.instance.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#where'
+      - include: '#type_signature'
+  - begin: >-
+      ^(\s*)(import)(\b(?!'))
+    beginCaptures:
+      '2': {name: keyword.other.import.bh}
+    end: |
+      (?x) # Detect end of import
+        # 'where' keyword
+        (?=\b(?<!')(where)\b(?!'))
+        # Decreasing indentation
+        |(?=\}|;)      # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    name: meta.import.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#where'
+      - match: (qualified|as|hiding)
+        captures:
+          '1': {name: "keyword.other.$1.bh"}
+      - include: '#package_name'
+      - include: '#package_exports'
+  - include: '#deriving'
+  - include: '#layout_herald'
+  - include: '#keyword'
+  - match: '^\s*(infix[lr]?)\s+(.*)'
+    captures:
+      '1': {name: "keyword.other.fixity.$1.bh"}
+      '2':
+        patterns:
+          - include: '#comment_like'
+          - include: '#integer_literals'
+          - match: ':[\p{S}\p{P}&&[^(),;\[\]`{}_"'']]*'
+            name: constant.other.operator.infix.bh
+          - include: "#infix_op"
+    name: meta.fixity-declaration.bh
+  - include: '#start_type_signature'
+  - include: '#overloaded_label'
+  - include: '#type_application'
+  - include: '#reserved_symbol'
+  - include: '#fun_decl'
+  - include: '#qualifier'
+  - match: ':[\p{S}\p{P}&&[^(),;\[\]`{}_"'']]*'
+    name: constant.other.operator.infix.bh
+  - include: '#data_constructor'
+  - include: '#prefix_op'
+  - include: '#infix_op'
+  - begin: '(\()(#)\s'
+    end: '(#)(\))'
+    beginCaptures:
+      '1': {name: punctuation.paren.bh}
+      '2': {name: keyword.operator.hash.bh}
+    endCaptures:
+      '1': {name: keyword.operator.hash.bh}
+      '2': {name: punctuation.paren.bh}
+    patterns:
+      - include: '#comma'
+      - include: '$self'
+  - begin: '(\()'
+    end: '(\))'
+    beginCaptures:
+      '1': {name: punctuation.paren.bh}
+    endCaptures:
+      '1': {name: punctuation.paren.bh}
+    patterns:
+      - include: '#comma'
+      - include: '$self'
+  - include: '#quasi_quote'
+  - begin: '(\[)'
+    end: '(\])'
+    beginCaptures:
+      '1': {name: punctuation.bracket.bh}
+    endCaptures:
+      '1': {name: punctuation.bracket.bh}
+    patterns:
+      - include: '#comma'
+      - include: '$self'
+  - include: '#record'
+repository:
+  block_comment:
+    applyEndPatternLast: 1
+    begin: '\{-'
+    captures:
+      '0': {name: punctuation.definition.comment.bh}
+    end: '-\}'
+    name: comment.block.bh
+    patterns:
+      - include: '#block_comment'
+  comments:
+    patterns:
+      # Haddock block: consecutive double-dashed lines, the first one starting with `-- |` or `-- $`
+      - begin: '^(\s*)(--\s[\|\$])'
+        beginCaptures:
+          '2': {name: punctuation.whitespace.comment.leading.bh}
+        end: '(?=^(?!\1--+(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])))'
+        name: comment.block.documentation.bh
+      # Haddock inline annotation (not necessarily at the start of a line)
+      - begin: '(^[ \t]+)?(--(@)\s)'
+        beginCaptures: 
+          '1': {name: punctuation.whitespace.comment.leading.bh}
+        end: \n
+        name: comment.line.documentation.bh
+      # Haddock block using {- -} comments
+      - applyEndPatternLast: 1
+        begin: '\{-\s?[\|\$\*\^]'
+        captures:
+          '0': {name: punctuation.definition.comment.bh}
+        end: '-\}'
+        name: comment.block.documentation.bh
+        patterns:
+          - include: '#block_comment'
+      - begin: >-
+          (^[ \t]+)?(?=--+(?![\p{S}\p{P}&&[^(),;\[\]`{}_"']]))
+        beginCaptures:
+          '1': {name: punctuation.whitespace.comment.leading.bh}
+        comment: 'Operators may begin with ''--'' as long as they are not entirely composed of ''-'' characters. This means comments can''t be immediately followed by an allowable operator character.'
+        end: '(?!\G)'
+        patterns:
+          - begin: '--'
+            beginCaptures: 
+              '0': {name: punctuation.definition.comment.bh}
+            end: \n
+            name: comment.line.double-dash.bh
+      - {include: '#block_comment'}
+  comment_like:
+    patterns:
+      - include: '#cpp'
+      - include: '#pragma'
+      - include: '#comments'
+  cpp:
+    captures:
+      '1': {name: punctuation.definition.preprocessor.c}
+    comment: 'In addition to bh''s "native" syntax, GHC permits the C preprocessor to be run on a source file.'
+    match: '^(#).*$' # `#` must be the first character on the line
+    name: meta.preprocessor.c
+  where:
+    patterns:
+      - begin: >-
+          (?x)
+            (?<!')\b(where)
+            \s*(\{)(?!-)
+        end: '(\})'
+        beginCaptures:
+          '1': {name: keyword.other.where.bh}
+          '2': {name: punctuation.brace.bh}
+        endCaptures:
+          '1': {name: punctuation.brace.bh}
+        patterns:
+          - include: '$self'
+          - match: ';'
+            name: punctuation.semicolon.bh
+      - match: '\b(?<!'')(where)\b(?!'')'
+        name: keyword.other.where.bh
+  layout_herald:
+    begin: >-
+      (?x)
+        (?:(?<!')\b(?:(where|let|m?do)|(of))|(\\\s*case(?:s)?))
+        \s*(\{)(?!-)
+    end: '(\})'
+    beginCaptures:
+      '1': {name: keyword.other.$1.bh}
+      '2': {name: keyword.control.of.bh}
+      '3': {name: keyword.control.lambda-case.bh}
+      '4': {name: punctuation.brace.bh}
+    endCaptures:
+      '1': {name: punctuation.brace.bh}
+    patterns:
+      - include: '$self'
+      - match: ';'
+        name: punctuation.semicolon.bh
+  keyword:
+    match: '\b(?<!'')(?:(where|let|in|default)|(m?do|if|then|else|case(?:s)?|of|proc|rec))\b(?!'')'
+    captures:
+      '1': {name: keyword.other.$1.bh}
+      '2': {name: keyword.control.$2.bh}
+  deriving:
+    patterns:
+      # Deriving (start of line)
+      - begin: '^(\s*)(deriving)\s+(?:(via|stock|newtype|anyclass)\s+)?'
+        beginCaptures:
+          '2': {name: keyword.other.deriving.bh}
+          '3': {name: keyword.other.deriving.strategy.$3.bh}
+        end: >-
+          (?x) # Detect end of deriving statement
+            # Decreasing indentation
+             (?=\}|;)      # Explicit indentation
+            |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+                \1\s+\S    # - more indented, or
+              | \s*        # - starts with whitespace, followed by:
+                (?: $      #   - the end of the line (i.e. empty line), or
+                |\{-[^@]   #   - the start of a block comment, or
+                |--+       #   - the start of a single-line comment.
+                   (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                           # The double dash may not be followed by other operator characters
+                           # (then it would be an operator, not a comment)
+              )
+        patterns:
+          - include: '#comment_like'
+          - match: '(?<!'')\b(instance)\b(?!'')'
+            name: keyword.other.instance.bh
+          - match: '(?<!'')\b(via|stock|newtype|anyclass)\b(?!'')'
+            captures:
+              '1': {name: keyword.other.deriving.strategy.$1.bh }
+          - include: '#type_signature'
+        name: meta.deriving.bh
+      # Deriving (not start of line, parenthesised type)
+      - begin: '(deriving)(?:\s+(stock|newtype|anyclass))?\s*(\()'
+        beginCaptures:
+          '1': {name: keyword.other.deriving.bh}
+          '2': {name: "keyword.other.deriving.strategy.$2.bh"}
+          '3': {name: punctuation.paren.bh}
+        end: '(\))'
+        endCaptures:
+          '1': {name: punctuation.paren.bh}
+        name: meta.deriving.bh
+        patterns:
+          - include: '#type_signature'
+      # Deriving (not start of line, unparenthesised type)
+      - match: |
+          (?x)
+            (deriving)(?:\s+(stock|newtype|anyclass))?\s+
+              ([\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+              (\s+(via)\s+(.*)$)?
+        captures:
+          '1': {name: keyword.other.deriving.bh}
+          '2': {name: "keyword.other.deriving.strategy.$2.bh"}
+          '3': {patterns: [{include: '#type_signature'}]}
+          '5': {name: keyword.other.deriving.strategy.via.bh}
+          '6': {patterns: [{include: '#type_signature'}]}
+        name: meta.deriving.bh
+      - match: '(?<!'')\b(via)\b(?!'')'
+        name: keyword.other.deriving.strategy.via.bh
+  prefix_op:
+    patterns:
+      - comment: >
+          An operator cannot be composed entirely of '-' characters; 
+          instead, it should be matched as a comment.
+        match: >-
+          (?x)
+            (\()\s*(?!(?:--+|\.\.)\))(\#+|[\p{S}\p{P}&&[^(),;\[\]`{}_"']]+(?<!\#))\s*(\))
+        captures:
+          '1': {name: punctuation.paren.bh}
+          '2': {name: entity.name.function.infix.bh}
+          '3': {name: punctuation.paren.bh}
+  infix_op:
+    patterns:
+      - match: >-
+          (?x)
+            ((?:(?<!'')('')?[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'']*\.)*)
+              (\#+|[\p{S}\p{P}&&[^(),;\[\]`{}_"']]+(?<!\#))
+        comment: >
+          In case this regex seems overly general, note that bh permits 
+          the definition of new operators which can be nearly any string of 
+          punctuation characters, such as $%^&*.
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: entity.name.namespace.bh}
+          '3': {name: keyword.operator.infix.bh}
+      - match: >-
+          (`)((?:[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'']*\.)*)([\p{Ll}\p{Lu}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'']*)(`)
+        captures:
+          '1': {name: punctuation.backtick.bh}
+          '2': {name: entity.name.namespace.bh}
+          '3':
+            patterns:
+              - include: '#data_constructor'
+          '4': {name: punctuation.backtick.bh}
+        comment: |
+          In case this regex seems unusual for an infix operator, note that bh
+          allows any ordinary function application (elem 4 [1..10]) to be rewritten
+          as an infix expression (4 `elem` [1..10]).
+        name: keyword.operator.function.infix.bh
+  package_exports:
+    begin: \(
+    beginCaptures:
+      '0': {name: punctuation.paren.bh}
+    end: \)
+    endCaptures:
+      '0': {name: punctuation.paren.bh}
+    applyEndPatternLast: 1
+    name: meta.declaration.exports.bh
+    patterns:
+      - include: '#comment_like'
+      - match: '\b(?<!'')(package)\b(?!'')'
+        captures:
+          '1': {name: keyword.other.package.bh}
+      - include: '#comma'
+      - include: '#export_constructs'
+      - begin: '\('
+        beginCaptures:
+          '0': {name: punctuation.paren.bh}
+        end: '\)'
+        endCaptures:
+          '0': {name: punctuation.paren.bh}
+        patterns:
+          - include: '#comment_like'
+          - include: '#record_wildcard'
+          - match: >-
+              (\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))
+            name: constant.other.operator.prefix.bh
+          - include: '#export_constructs'
+          - include: '#comma'
+  export_constructs:
+    patterns:
+      - include: '#comment_like'
+      - begin: '\b(?<!'')(pattern)\b(?!'')'
+        beginCaptures:
+          '1': {name: keyword.other.pattern.bh}
+        end: >-
+         (?x)
+            # Data constructor
+            ([\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+            # Prefix form of symbolic constructor
+            | (\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)\s*(\))
+        endCaptures:
+          '1': {name: constant.other.bh}
+          '2': {name: punctuation.paren.bh}
+          '3': {name: constant.other.operator.prefix.bh}
+          '4': {name: punctuation.paren.bh}
+        patterns:
+          - include: '#comment_like'
+      - begin: '\b(?<!'')(type)\b(?!'')'
+        beginCaptures:
+          '1': {name: keyword.other.type.bh}
+        end: '(?=,|\))'
+        patterns:
+          - include: '#comment_like'
+          - include: '#reserved_symbol'
+          - include: '#type_constructor'
+          - include: '#type_operator'
+      - include: '#record_wildcard'
+      - include: '#reserved_symbol'
+      - match: >-
+          (\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))
+        name: storage.type.operator.bh
+      - match: >-
+          (?<!')\b[\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*
+        name: entity.name.function.bh
+      - match: >-
+          (?<!')\b[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*
+        name: storage.type.bh
+      - include: '#prefix_op'
+  comma:
+    match: ','
+    name: punctuation.separator.comma.bh
+  package_name:
+    match: >-
+      (?<conid>[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*(\.\g<conid>)?)
+    name: entity.name.namespace.bh
+  pragma:
+    begin: '\{-#'
+    end: '#-\}'
+    name: meta.preprocessor.bh
+    patterns:
+      - include: '#comments'
+      # LANGUAGE extensions (as of GHC 8.10)
+      - begin: >-
+          (?xi)
+          \b(?<!')(LANGUAGE)\b(?!')
+        end: '(?=#-\})'
+        beginCaptures:
+          '1': {name: keyword.other.preprocessor.pragma.bh}
+        patterns:
+          - include: '#comments'
+          - match: >-
+              (?x)
+                \b(?<!')
+                (?:No)?
+                (?:AutoDeriveTypeable|DatatypeContexts|DoRec|IncoherentInstances|MonadFailDesugaring|MonoPatBinds|NullaryTypeClasses|OverlappingInstances|PatternSignatures|RecordPuns|RelaxedPolyRec)
+                \b(?!')
+            name: invalid.deprecated
+          - match: >-
+              (?x)
+                \b(?<!')
+                (
+                (?:No)?
+                (?:AllowAmbiguousTypes|AlternativeLayoutRuleTransitional|AlternativeLayoutRule|Arrows|BangPatterns|BinaryLiterals|CApiFFI|CPP|CUSKs|ConstrainedClassMethods|ConstraintKinds|DataKinds|DefaultSignatures|DeriveAnyClass|DeriveDataTypeable|DeriveFoldable|DeriveFunctor|DeriveGeneric|DeriveLift|DeriveTraversable|DerivingStrategies|DerivingVia|DisambiguateRecordFields|DoAndIfThenElse|BlockArguments|DuplicateRecordFields|EmptyCase|EmptyDataDecls|EmptyDataDeriving|ExistentialQuantification|ExplicitForAll|ExplicitNamespaces|ExtendedDefaultRules|FlexibleContexts|FlexibleInstances|ForeignFunctionInterface|FunctionalDependencies|GADTSyntax|GADTs|GHCForeignImportPrim|Generali(?:s|z)edNewtypeDeriving|ImplicitParams|ImplicitPrelude|ImportQualifiedPost|ImpredicativeTypes|TypeFamilyDependencies|InstanceSigs|ApplicativeDo|InterruptibleFFI|JavaScriptFFI|KindSignatures|LambdaCase|LexicalNegation|LiberalTypeSynonyms|LinearTypes|MagicHash|MonadComprehensions|MonoLocalBinds|MonomorphismRestriction|MultiParamTypeClasses|MultiWayIf|NumericUnderscores|NPlusKPatterns|NamedFieldPuns|NamedWildCards|NegativeLiterals|HexFloatLiterals|NondecreasingIndentation|NumDecimals|OverloadedLabels|OverloadedLists|OverloadedStrings|PackageImports|ParallelArrays|ParallelListComp|PartialTypeSignatures|PatternGuards|PatternSynonyms|PolyKinds|PolymorphicComponents|QualifiedDo|QuantifiedConstraints|PostfixOperators|QuasiQuotes|Rank2Types|RankNTypes|RebindableSyntax|RecordWildCards|RecursiveDo|RelaxedLayout|RoleAnnotations|ScopedTypeVariables|StandaloneDeriving|StarIsType|StaticPointers|StrictData|Strict|TemplatebhQuotes|Templatebh|StandaloneKindSignatures|TraditionalRecordSyntax|TransformListComp|TupleSections|TypeApplications|TypeInType|TypeFamilies|TypeOperators|TypeSynonymInstances|UnboxedTuples|UnboxedSums|UndecidableInstances|UndecidableSuperClasses|UnicodeSyntax|UnliftedFFITypes|UnliftedNewtypes|ViewPatterns|UnliftedDatatypes|OverloadedRecordDot|OverloadedRecordUpdate|FieldSelectors)
+                )
+                \b(?!')
+            captures:
+              '1': {name: keyword.other.preprocessor.extension.bh}
+          - include: '#comma'
+      - begin: >-
+          (?xi)
+            \b(?<!')(SPECIALI(?:S|Z)E)
+            (?:
+            \s*( \[ [^\[\]]* \])?\s*
+            |\s+
+            )
+            (instance)\b(?!')
+        end: '(?=#-\})'
+        beginCaptures:
+          '1': {name: keyword.other.preprocessor.pragma.bh}
+          '2':
+            patterns:
+              - include: '#inline_phase'
+          '3': {name: keyword.other.instance.bh}
+        patterns:
+          - include: '#type_signature'
+      - begin: >-
+          (?xi)
+            \b(?<!')(SPECIALI(?:S|Z)E)\b(?!')
+            (?:\s+(INLINE)\b(?!'))?
+            (?:\s*(\[ [^\[\]]* \])?)
+            \s*
+        end: '(?=#-\})'
+        beginCaptures:
+          '1': {name: keyword.other.preprocessor.pragma.bh}
+          '2': {name: keyword.other.preprocessor.pragma.bh}
+          '3':
+            patterns:
+              - include: '#inline_phase'
+        patterns:
+          - include: '$self'
+      - match: >-
+          (?xi)
+          \b(?<!')
+            (LANGUAGE|OPTIONS_GHC|OPTIONS_HADDOCK|OPTIONS|INCLUDE
+            |MINIMAL|UNPACK|OVERLAPS|INCOHERENT
+            |NOUNPACK|SOURCE|OVERLAPPING|OVERLAPPABLE|INLINE
+            |NOINLINE|INLINE?ABLE|CONLIKE|LINE|COLUMN|RULES
+            |COMPLETE)\b(?!')
+        name: keyword.other.preprocessor.bh
+      - begin: '(?i)\b(DEPRECATED|WARNING)\b'
+        beginCaptures:
+          '1': {name: keyword.other.preprocessor.pragma.bh}
+        end: '(?=#-\})'
+        patterns:
+          - include: '#comments'
+          - include: '#string_literal'
+  data_context:
+    match: |
+      (?x)
+        (.*)
+        (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+        (=>|⇒)
+        (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+    captures:
+      '1':
+         patterns:
+            # Need to highlight the left of a context arrow => as a type,
+            # but need to know when to stop: when we see a = or ::
+            # that is not guarded by parentheses:
+            #
+            #   foo :: abc => def
+            #         ^^^^^^^
+            #
+            #   foo :: forall (a :: T). C a => B
+            #         ^^^^^^^^^^^^^^^^^^^^^^^^
+            #
+            - include: '#comment_like'
+            - include: '#forall'
+            - begin: '(?=''?\()'
+              end: '(?=\))'
+              patterns:
+                - include: '#type_signature'
+            - begin: '(?=''?\[)'
+              end: '(?=\])'
+              patterns:
+                - include: '#type_signature'
+            - match: >-
+                (?x)
+                  (\S*)\s*
+                  (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+                  (::|∷|=)
+                  (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+              captures:
+                '1':
+                  patterns:
+                    - include: '#comment_like'
+                    - include: '#forall'
+                    - include: '#record_decl_field'
+                '2':
+                  patterns:
+                    - include: '#reserved_symbol'
+                '3':
+                  patterns:
+                    - include: '#type_signature'
+            - include: '#type_signature'
+      '2': {name: keyword.operator.big-arrow.bh}
+  data_constructor:
+    patterns:
+      - match: >-
+          \b(?<!')[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*(?![\.'\w])
+        name: constant.other.bh
+      - match: >-
+          (\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))
+        name: constant.other.operator.bh
+  qualifier:
+    match: >-
+      \b(?<!')[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.
+    name: entity.name.namespace.bh
+  record_decl:
+    begin: '({)(?!-)'
+    beginCaptures:
+      '1': {name: punctuation.brace.bh}
+    end: '(?<!-)(})'
+    endCaptures:
+      '1': {name: punctuation.brace.bh}
+    name: meta.record.definition.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#record_decl_field'
+  record:
+    begin: '({)(?!-)'
+    beginCaptures:
+      '1': {name: punctuation.brace.bh}
+    end: '(?<!-)(})'
+    endCaptures:
+      '1': {name: punctuation.brace.bh}
+    name: meta.record.bh
+    patterns:
+      - include: '#comment_like'
+      - include: '#record_field'
+  record_decl_field:
+    begin: |
+      (?x)
+        (?:([\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+          |(\()\s*([\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)\s*(\))
+        )
+    end: '(,)|(?=})'
+    beginCaptures:
+      '1': {name: variable.other.member.definition.bh}
+      '2': {name: punctuation.paren.bh}
+      '3': {name: variable.other.member.definition.bh}
+      '4': {name: punctuation.paren.bh}
+    endCaptures:
+      '1': {name: punctuation.comma.bh}
+    patterns:
+      - include: '#comment_like'
+      - include: '#comma'
+      - include: '#double_colon'
+      - include: '#type_signature'
+      - include: '#record_decl_field'
+  record_wildcard:
+    match: >- 
+      (?x)
+        (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+        (\.\.)
+        (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+    captures:
+      '1': {name: variable.other.member.wildcard.bh}
+  record_field:
+    patterns:
+      - begin: |
+          (?x)
+            (?:([\p{Ll}\p{Lu}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}\.']*)
+              |(\()\s*([\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)\s*(\))
+            )
+        end: '(,)|(?=})'
+        beginCaptures:
+          '1': 
+            name: variable.other.member.bh
+            patterns:
+              - include: '#qualifier'
+          '2': {name: punctuation.paren.bh}
+          '3': {name: variable.other.member.bh}
+          '4': {name: punctuation.paren.bh}
+        endCaptures:
+          '1': {name: punctuation.comma.bh}
+        patterns:
+          - include: '#comment_like'
+          - include: '#comma'
+          - include: '$self'
+      - include: '#record_wildcard'
+  role_annotation:
+    patterns:
+      - begin: '^(\s*)(type)\s+(role)\b(?!'')'
+        beginCaptures:
+          '2': {name: keyword.other.type.bh}
+          '3': {name: keyword.other.role.bh}
+        end: >-
+          (?x) # Detect end of block by decreasing indentation:
+            (?=\}|;)       # Explicit indentation
+            |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+                \1\s+\S    # - more indented, or
+              | \s*        # - starts with whitespace, followed by:
+                (?: $      #   - the end of the line (i.e. empty line), or
+                |\{-[^@]   #   - the start of a block comment, or
+                |--+       #   - the start of a single-line comment.
+                   (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                           # The double dash may not be followed by other operator characters
+                           # (then it would be an operator, not a comment)
+              )
+        name: meta.role-annotation.bh
+        patterns:
+          - include: '#comment_like'
+          - include: '#type_constructor'
+          - match: '\b(?<!'')(nominal|representational|phantom)\b(?!'')'
+            captures:
+              '1': {name: "keyword.other.role.$1.bh"}
+  fun_decl:
+    begin: |
+      (?x)^(\s*)
+        (primitive\s+)?
+        (type\s+)?
+        (?<fn>
+          (?:
+            [\p{Ll}_\p{Lu}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\#*
+          | \(\s*
+              (?!--+\))
+              [\p{S}\p{P}&&[^(),:;\[\]`{}_"']]
+              [\p{S}\p{P}&&[^(),;\[\]`{}_"']]*
+            \s*\)
+          )
+          (?:\s*,\s*\g<fn>)?
+        )
+        \s*(?<![\p{S}\p{P}&&[^\),;\]`}_"']])(::|∷)(?![\p{S}\p{P}&&[^\(,;\[`{_"']])
+    beginCaptures:
+      '4':
+        name: entity.name.function.bh
+        patterns:
+          - include: '#reserved_symbol'
+          - include: '#prefix_op'
+      '5': {name: keyword.operator.double-colon.bh}
+    name: meta.function.type-declaration.bh
+    patterns:
+      - include: '#type_signature'
+    end: |
+      (?x)
+        # End of type annotation:
+          # To the left of a reserved symbolic keyword such as = or <-
+        (?= 
+            # non-symbolic character
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+            # symbolic keyword except (->)
+            ((<-|←)|(=)|(-<|↢)|(-<<|⤛))
+            # non-symbolic character
+            ([(),;\[\]`{}_"']|[^\p{S}\p{P}])
+        )
+        # Decreasing indentation:
+        |(?=\}|;)      # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+
+  adt_constructor:
+    patterns:
+      - include: '#comment_like'
+      - begin: >-
+          (?x)
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+            (?:(=)|(\|))
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+        beginCaptures:
+          '1': {name: keyword.operator.eq.bh}
+          '2': {name: keyword.operator.pipe.bh}
+        end: >-
+          (?x)
+            (?: # Infix data constructor
+              # First argument
+              (?:
+              # Simple type
+                (?<!')\b((?:[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'\.])+)
+              # Type inside balanced parentheses
+              | ('? # Optional promotion tick
+                  (?<paren>
+                    \(          # Opening parenthesis
+                    (?:
+                      [^\(\)]*  # Match non-parentheses
+                    | \g<paren> # or recurse into further depth
+                    )*
+                    \)          # Closing parenthesis
+                  )
+                )
+              # Type inside balanced brackets
+              | ('? # Optional promotion tick
+                  (?<brac>
+                    \[          # Opening bracket
+                    (?:
+                      [^\[\]]*  # Match non-brackets
+                    | \g<brac>  # or recurse into further depth
+                    )*
+                    \]          # Closing bracket
+                  )
+                )
+              )
+              # Then either
+              \s*
+                # - a symbolic infix constructor, or
+              (?:(?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)
+                # - an alphabetic infix constructor
+              | (`)([\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)(`)
+              )
+            ) # Otherwise, prefix data constructor, either:
+            | # - an alphabetic data constructor e.g. "Cons_123"
+              (?:(?<!')\b([\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*))
+            | # - a symbolic (prefix) data constructor
+              (\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))
+            | # Otherwise, try to fail early to avoid excessive backtracking (https://github.com/JustusAdam/language-bh/issues/161)
+                # Fail when detecting a lowercase identifier and then something not starting with a tick or colon
+                (?=\b(?<!')(?!(?:forall|deriving)\s)[\p{Ll}_]\S+\s+[^`:])
+                # Fail when seeing another equal signs or pipe symbol
+               |(?=
+                  (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
+                  (?:=|\|)
+                  (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
+                )
+        endCaptures:
+          '1':
+            patterns:
+             - include: '#type_signature'
+          '2':
+            patterns:
+              - include: '#type_signature'
+          '4':
+            patterns:
+              - include: '#type_signature'
+          '6': {name: constant.other.operator.infix.bh}
+          '7': {name: punctuation.backtick.bh}
+          '8': {name: constant.other.infix.bh}
+          '9': {name: punctuation.backtick.bh}
+          '10': {name: constant.other.bh}
+          '11': {name: punctuation.paren.bh}
+          '12': {name: constant.other.operator.prefix.bh}
+          '13': {name: punctuation.paren.bh}
+        patterns:
+          - include: '#comment_like'
+          - include: '#deriving'
+          - include: '#record_decl'
+          - include: '#forall'
+          - include: '#data_context'
+          - include: '#type_signature'
+  gadt_constructor:
+    patterns:
+      # GADT constructor on start of line
+      - begin: >-
+          (?x)
+             ^(\s*)
+                (?:
+                  (\b(?<!')[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+                |(\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))
+                )
+        beginCaptures:
+          '2': {name: constant.other.bh}
+          '3': {name: punctuation.paren.bh}
+          '4': {name: constant.other.operator.prefix.bh}
+          '5': {name: punctuation.paren.bh}
+        end: |
+          (?x)
+            # GADT constructor ends
+            (?=\b(?<!'')deriving\b(?!'))  
+                  # Decreasing indentation
+            |(?=\}|;)      # Explicit indentation
+            |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+                \1\s+\S    # - more indented, or
+              | \s*        # - starts with whitespace, followed by:
+                (?: $      #   - the end of the line (i.e. empty line), or
+                |\{-[^@]   #   - the start of a block comment, or
+                |--+       #   - the start of a single-line comment.
+                   (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                           # The double dash may not be followed by other operator characters
+                           # (then it would be an operator, not a comment)
+              )
+        patterns:
+          - include: '#comment_like'
+          - include: '#deriving'
+          - include: '#double_colon'
+          - include: '#record_decl'
+          - include: '#type_signature'
+      # Remaining case: GADT constructor not on start of line
+      - begin: >-
+          (?x)
+            (\b(?<!')[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}]*) # named constructor
+           |(\()\s*(:[\p{S}\p{P}&&[^(),;\[\]`{}_"']]*)\s*(\))    # prefix operator
+        beginCaptures:
+          '1': {name: constant.other.bh}
+          '2': {name: punctuation.paren.bh}
+          '3': {name: constant.other.operator.prefix.bh}
+          '4': {name: punctuation.paren.bh}
+        end: '(?=;|\}|$)'
+        patterns:
+          - include: '#comment_like'
+          - include: '#deriving'
+          - include: '#double_colon'
+          - include: '#record_decl'
+          - include: '#type_signature'
+  type_application:
+    patterns:
+      - match: '(?<=[\s,;\[\]{}"])(@)(\(\s*\))'
+        captures:
+          '1': {name: keyword.operator.prefix.at.bh}
+          '2': {name: support.constant.unit.bh}
+        name: meta.type-application.bh
+      - begin: '(?<=[\s,;\[\]{}"])(@)('')?(\()'
+        beginCaptures: 
+          '1': {name: keyword.operator.prefix.at.bh}
+          '2': {name: keyword.operator.promotion.bh}
+          '3': {name: punctuation.paren.bh}
+        end: '\)'
+        endCaptures:
+          '0': {name: punctuation.paren.bh}
+        name: meta.type-application.bh
+        patterns:
+          - include: '#type_signature'
+      - begin: '(?<=[\s,;\[\]{}"])(@)('')?(\[)'
+        beginCaptures: 
+          '1': {name: keyword.operator.prefix.at.bh}
+          '2': {name: keyword.operator.promotion.bh}
+          '3': {name: punctuation.bracket.bh}
+        end: '\]'
+        name: meta.type-application.bh
+        endCaptures:
+          '0': {name: punctuation.bracket.bh}
+        patterns:
+          - include: '#type_signature'
+      - begin: '(?<=[\s,;\[\]{}"])(@)(?=\")'
+        beginCaptures: 
+          '1': {name: keyword.operator.prefix.at.bh}
+        end: '(?<=\")'
+        name: meta.type-application.bh
+        patterns:
+          - include: '#string_literal'
+      - begin: '(?<=[\s,;\[\]{}"])(@)(?=[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}''])'
+        beginCaptures: 
+          '1': {name: keyword.operator.prefix.at.bh}
+        end: '(?![\p{Ll}_\p{Lu}\p{Lt}\p{Nd}''])'
+        name: meta.type-application.bh
+        patterns:
+          - include: '#type_signature'
+  type_signature:
+    patterns:
+      - include: '#comment_like'
+      - match: '('')?(\()\s*(\))'
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.paren.bh}
+          '3': {name: punctuation.paren.bh}
+        name: support.constant.unit.bh
+      - match: '('')?(\()\s*,[\s,]*(\))'
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.paren.bh}
+          '3': {name: punctuation.paren.bh}
+        name: support.constant.tuple.bh
+      - match: '('')?(\[)\s*(\])'
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.bracket.bh}
+          '3': {name: punctuation.bracket.bh}
+        name: support.constant.empty-list.bh
+      - include: '#integer_literals'
+      - match: '(::|∷)(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])'
+        name: keyword.operator.double-colon.bh
+      - include: '#forall'
+      - match: '=>|⇒'
+        name: keyword.operator.big-arrow.bh
+      - include: '#string_literal'
+      - match: '''[^'']'''
+        name: invalid
+      - include: '#type_application'
+      - include: '#reserved_symbol'
+      - include: '#type_operator'
+      - include: '#type_constructor'
+      - begin: '(\()'
+        end: '(\))'
+        beginCaptures:
+          '1': {name: punctuation.paren.bh}
+        endCaptures:
+          '2': {name: punctuation.paren.bh}
+        patterns:
+          - include: '#comma'
+          - include: '#type_signature'
+      - begin: '('')?(\()'
+        end: '(\))'
+        beginCaptures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.paren.bh}
+        endCaptures:
+          '1': {name: punctuation.paren.bh}
+        patterns:
+          - include: '#comma'
+          - include: '#type_signature'
+      - begin: '('')?(\[)'
+        end: '(\])'
+        beginCaptures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.bracket.bh}
+        endCaptures:
+          '1': {name: punctuation.bracket.bh}
+        patterns:
+          - include: '#comma'
+          - include: '#type_signature'
+      - include: '#type_variable'
+  double_colon:
+    match: '\s*(::|∷)(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])\s*'
+    captures:
+      '1': {name: keyword.operator.double-colon.bh}
+  start_type_signature:
+    patterns:
+      - begin: '^(\s*)(::|∷)(?![\p{S}\p{P}&&[^\(,;\[`{_"'']])\s*'
+        beginCaptures:
+          '2': {name: keyword.operator.double-colon.bh}
+        end: >-
+          (?x)
+            # End type annotation when seeing one of:
+            (?=
+              \#?\)                             # closing parenthesis
+              |\]                               # closing bracket
+              |,                                # comma
+              |(?<!')\b(in|then|else|of)\b(?!') # keyword
+              |                                 # symbolic keyword except (->)
+                (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+                (?:
+                   (\\|λ)
+                  |(<-|←)
+                  |(=)
+                  |(-<|↢)
+                  |(-<<|⤛)
+                )
+                ([(),;\[\]`{}_"']|[^\p{S}\p{P}])
+              |(\#|@)-\}                             # End of annotation block (pragma)
+              # Decreasing indentation:
+              | (?=\}|;)     # Explicit indentation
+              |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+                  \1\s*\S    # - equally indented, or
+                | \s*        # - starts with whitespace, followed by:
+                  (?: $      #   - the end of the line (i.e. empty line), or
+                  |\{-[^@]   #   - the start of a block comment, or
+                  |--+       #   - the start of a single-line comment.
+                     (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                             # The double dash may not be followed by other operator characters
+                             # (then it would be an operator, not a comment)
+                )
+            )
+        patterns:
+          - include: '#type_signature'
+        name: meta.type-declaration.bh
+      - begin: '(?<![\p{S}\p{P}&&[^\(,;\[`{_"'']])(::|∷)(?![\p{S}\p{P}&&[^\(,;\[`{_"'']])'
+        beginCaptures:
+          '1': {name: keyword.operator.double-colon.bh}
+        end: >-
+          (?x)
+            # End type annotation when seeing one of:
+            (?=
+              \#?\)                             # closing parenthesis
+              |\]                               # closing bracket
+              |,                                # comma
+              |\b(?<!')(in|then|else|of)\b(?!') # keyword
+              |(\#|@)-\}                        # End of annotation block (Liquidbh or pragma)
+              |                                 # symbolic keyword except (->)
+                (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']])
+                (?:
+                   (\\|λ)
+                  |(<-|←)
+                  |(=)
+                  |(-<|↢)
+                  |(-<<|⤛)
+                )
+                ([(),;\[\]`{}_"']|[^\p{S}\p{P}])
+              # Indentation 
+              |(?=\}|;)      # Explicit indentation
+              |$             # End of line
+            )
+        patterns:
+          - include: '#type_signature'
+  type_variable:
+    match: '\b(?<!'')(?!(?:forall|deriving)\b(?!''))[\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'']*'
+    name: variable.other.generic-type.bh
+  type_constructor:
+    patterns:
+      # Type starting with a capital letter (optional promotion & qualification)
+      - match: >-
+          (?x)
+            # Optional promotion tick
+              (')?
+            # Optional qualified name
+              ((?:\b[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.)*)
+            # Type constructor proper
+              (\b[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: entity.name.namespace.bh}
+          '3': {name: storage.type.bh}
+      # Prefix form of a type operator (optional promotion & qualification)
+      - match: >-
+          (?x)
+            # Optional promotion tick
+              (')?
+            # Opening parenthesis
+              (\()\s*
+            # Optional qualified name
+              ((?:[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.)*)
+            # Type operator proper
+              ([\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)
+            # Closing parenthesis
+              \s*(\))
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.paren.bh}
+          '3': {name: entity.name.namespace.bh}
+          '4': {name: storage.type.operator.bh }
+          '5': {name: punctuation.paren.bh}
+  overloaded_label:
+    patterns:
+      # See https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0170-unrestricted-overloadedlabels.rst
+      - match: >-
+          (?x) 
+            (?<![\p{Ll}_\p{Lu}\p{Lt}\p{Nd}\p{S}\p{P}&&[^(,;\[`{]]) # Disallow closing characters
+            (\#)
+              (?:
+              # String
+              ("(?:\\"|[^"])*")
+              # Sequence of allowed label identifiers
+              |[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'\.]+
+              )
+        captures:
+          '1': {name: keyword.operator.prefix.hash.bh}
+          '2':
+            patterns:
+              - include: '#string_literal'
+        name: entity.name.label.bh
+  reserved_symbol:
+    patterns:
+      # Fully reserved symbols,
+      # not including '::' (special treatment as it starts type highlighting),
+      # nor '=>' (it highlights its precedent as a type),
+      # nor '∀' (highlights subsequent dot for quantification).
+      - match: >-
+          (?x)
+            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])
+            (?:
+               (\.\.)
+              |(:)
+              |(=)
+              |(\\)     # λ not reserved as it is a letter
+              |(\|)
+              |(<-|←)
+              |(->|→)
+              |(-<|↢)
+              |(-<<|⤛)
+              |(>-|⤚)
+              |(>>-|⤜)
+            )
+            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])
+        captures:
+          '1': {name: keyword.operator.double-dot.bh}
+          '2': {name: keyword.operator.colon.bh}
+          '3': {name: keyword.operator.eq.bh}
+          '4': {name: keyword.operator.lambda.bh}
+          '5': {name: keyword.operator.pipe.bh}
+          '6': {name: keyword.operator.arrow.left.bh}
+          '7': {name: keyword.operator.arrow.bh}
+          '8': {name: keyword.operator.arrow.left.tail.bh}
+          '9': {name: keyword.operator.arrow.left.tail.double.bh}
+          '10': {name: keyword.operator.arrow.tail.bh}
+          '11': {name: keyword.operator.arrow.tail.double.bh}
+      # Reserved postfix symbol: '#'
+      # This allows users to specify highlighting of '#' dependent on theme,
+      # as we are unfortunately unable to make a decision based on enabled extensions.
+      - match: >-
+          (?x)
+            (?<=[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}\p{S}\p{P}&&[^\#,;\[`{]]) # Require closing characters
+            (\#+)
+            (?![\p{Ll}_\p{Lu}\p{Lt}\p{Nd}\p{S}\p{P}&&[^),;\]`}]])   # Disallow opening character
+        captures:
+          '1': {name: keyword.operator.postfix.hash.bh}
+      # Reserved tight infix symbol: '@'
+      - match: >-
+          (?x)
+            (?<=[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'\)\}\]]) # Require closing characters
+            (@)
+            (?=[\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'\(\[\{]) # Require opening character
+        captures:
+          '1': {name: keyword.operator.infix.tight.at.bh}
+      # Reserved prefix symbols,
+      # not including '@' (special treatment, as a type application starts type highlighting).
+      - match: >-
+          (?x)
+            (?<![\p{Ll}_\p{Lu}\p{Lt}\p{Nd}\p{S}\p{P}&&[^(,;\[`{]])  # Disallow closing characters
+            (?:(~)|(!)|(-)|(\$\$)|(\$)|(%))
+            (?=[\p{Ll}_'\p{Lu}\p{Lt}\p{Nd}\(\{\[]) # Require opening character (non operator symbol)
+        captures:
+          '1': {name: keyword.operator.prefix.tilde.bh}
+          '2': {name: keyword.operator.prefix.bang.bh}
+          '3': {name: keyword.operator.prefix.minus.bh}
+          '4': {name: keyword.operator.prefix.double-dollar.bh}
+          '5': {name: keyword.operator.prefix.dollar.bh}
+          '6': {name: keyword.operator.prefix.modifier.bh}
+  type_operator:
+    patterns:
+      # Symbolic type operator (optional promotion & qualification)
+      - match: >-
+          (?x)
+            # Optional promotion tick
+              (?:(?<!')('))?
+            # Optional qualified name
+              ((?:\b[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.)*)
+            # Type operator proper
+              (?![#@]?-})(\#+|[\p{S}\p{P}&&[^(),;\[\]`{}_"']]+(?<!\#))
+              #((?:[\p{S}\p{P}&&[^(),;\[\]`{}_"']&&[^#@]]|[@#](?!-}))+)
+        captures:
+          '1': {name: keyword.operator.promotion.bh }
+          '2': {name: entity.name.namespace.bh }
+          '3': {name: storage.type.operator.infix.bh }
+      # Infix form of alphanumeric type (optional promotion & qualification)
+      - match: >-
+          (?x)
+            # Optional promotion tick
+              (')?
+            # Opening backtick
+              (\`)
+            # Optional qualified name
+              ((?:[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.)*)
+            # Type constructor proper
+              ([\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)
+            # Closing backtick
+              (`)
+        captures:
+          '1': {name: keyword.operator.promotion.bh}
+          '2': {name: punctuation.backtick.bh}
+          '3': {name: entity.name.namespace.bh}
+          '4': {name: storage.type.infix.bh}
+          '5': {name: punctuation.backtick.bh}
+  forall:
+    begin: >-
+      (?x)
+        # Alphabetic forall
+        (?:
+        \b(?<!')
+        (forall)
+        \b(?!')
+        )
+        |
+        # Symbolic forall
+        (?:
+        # Not preceded by a symbol except reserved symbols
+        (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])
+        (∀)
+        # Not followed by a symbol except reserved symbols
+        (?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])
+        )
+    end: '(\.)|(->|→)'
+    beginCaptures: 
+      '1': {name: keyword.other.forall.bh}
+      '2': {name: keyword.other.forall.bh}
+    endCaptures:
+      '1': {name: keyword.operator.period.bh}
+      '2': {name: keyword.operator.arrow.bh}
+    patterns:
+      - include: '#comment_like'
+      - include: '#type_variable'
+      - include: '#type_signature'
+  string_literal:
+    begin: '"'
+    beginCaptures:
+      '0': {name: punctuation.definition.string.begin.bh}
+    end: '"'
+    endCaptures:
+      '0': {name: punctuation.definition.string.end.bh}
+    name: string.quoted.double.bh
+    patterns:
+      - match: '\\(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS|US|SP|DEL|[abfnrtv\\\"''\&])'
+        name: constant.character.escape.bh
+      - match: '\\o[0-7]+|\\x[0-9A-Fa-f]+|\\[0-9]+'
+        name: constant.character.escape.octal.bh
+      - match: '\\\^[A-Z@\[\]\\\^_]'
+        name: constant.character.escape.control.bh
+      - begin: \\\s
+        beginCaptures:
+          '0': {name: constant.character.escape.begin.bh}
+        end: \\
+        endCaptures:
+          '0': {name: constant.character.escape.end.bh}
+        patterns:
+          - match: \S+
+            name: invalid.illegal.character-not-allowed-here.bh
+  char_literal:
+    captures:
+      '1': {name: punctuation.definition.string.begin.bh}
+      '2': {name: constant.character.escape.bh}
+      '3': {name: constant.character.escape.octal.bh}
+      '4': {name: constant.character.escape.hexadecimal.bh}
+      '5': {name: constant.character.escape.control.bh}
+      '6': {name: punctuation.definition.string.end.bh}
+    match: |
+      (?x)
+        (?<![\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'])
+        (')
+        (?:
+          [\ -\[\]-~]                         # Basic Char
+        | (\\(?:NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE
+             |DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS
+             |US|SP|DEL|[abfnrtv\\\"'\\&]))   # Escapes
+        | (\\o[0-7]+)                         # Octal Escapes
+        | (\\x[0-9A-Fa-f]+)                   # Hexadecimal Escapes
+        | (\\\^[A-Z@\[\]\\\^_])                 # Control Chars
+        )
+        (')
+    name: string.quoted.single.bh
+  float_literals:
+    comment: 'Floats are decimal or hexadecimal'
+    match: >-
+      (?x)
+        \b(?<!')
+        (?:  # Decimal
+          ([0-9][_0-9]*\.[0-9][_0-9]*(?:[eE][-+]?[0-9][_0-9]*)?
+          |[0-9][_0-9]*[eE][-+]?[0-9][_0-9]*
+          )
+        |    # Hexadecimal
+          (0[xX]_*[0-9a-fA-F][_0-9a-fA-F]*\.[0-9a-fA-F][_0-9a-fA-F]*(?:[pP][-+]?[0-9][_0-9]*)?
+          |0[xX]_*[0-9a-fA-F][_0-9a-fA-F]*[pP][-+]?[0-9][_0-9]*
+          )
+        )\b(?!')
+    captures:
+      '1': {name: constant.numeric.floating.decimal.bh}
+      '2': {name: constant.numeric.floating.hexadecimal.bh}
+  integer_literals:
+    match: >-
+      (?x)
+        \b(?<!')
+        (?:
+          ([0-9][_0-9]*)                    # Decimal integer
+        | (0[xX]_*[0-9a-fA-F][_0-9a-fA-F]*) # Hexadecimal integer
+        | (0[oO]_*[0-7][_0-7]*)             # Octal integer
+        | (0[bB]_*[01][_01]*)               # Binary integer
+        )
+        \b(?!')
+    captures:
+      '1': {name: constant.numeric.integral.decimal.bh}
+      '2': {name: constant.numeric.integral.hexadecimal.bh}
+      '3': {name: constant.numeric.integral.octal.bh}
+      '4': {name: constant.numeric.integral.binary.bh}
+  numeric_literals:
+    patterns:
+      # Need to try to parse floating literals first,
+      # to avoid having leftover dots.
+      - include: '#float_literals'
+      - include: '#integer_literals'
+  ffi:
+    begin: '^(\s*)(foreign)\s+(import|export)\s+'
+    beginCaptures:
+      '2': {name: keyword.other.foreign.bh}
+      '3': {name: "keyword.other.$3.bh"}
+    name: meta.$3.foreign.bh
+    end: |
+      (?x) # Detect end of FFI block by decreasing indentation:
+        (?=\}|;)       # Explicit indentation
+        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
+            \1\s+\S    # - more indented, or
+          | \s*        # - starts with whitespace, followed by:
+            (?: $      #   - the end of the line (i.e. empty line), or
+            |\{-[^@]   #   - the start of a block comment, or
+            |--+       #   - the start of a single-line comment.
+               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
+                       # The double dash may not be followed by other operator characters
+                       # (then it would be an operator, not a comment)
+          )
+    patterns:
+      - include: '#comment_like'
+      - match: '\b(?<!'')(ccall|cplusplus|dotnet|jvm|stdcall|prim|capi)\s+'
+        captures:
+          '1': {name: "keyword.other.calling-convention.$1.bh"}
+      - begin: '(?=")|(?=\b(?<!'')([\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}'']*)\b(?!''))'
+        end: '(?=(::|∷)(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']]))'
+        patterns:
+          # safe/unsafe/interruptible keywords,
+          # but we must take care to still allow a function named "safe" without such a keyword
+          # for instance:
+          #
+          # foreign import ccall safe foo :: ...
+          #                      ^^^^ keyword
+          #
+          # foreign import ccall safe :: ...
+          #                      ^^^^ not a keyword
+          - include: '#comment_like'
+          - match: |
+              (?x)
+                \b(?<!')(safe|unsafe|interruptible)\b(?!')
+                \s*
+                ("(?:\\"|[^"])*")?
+                \s*
+                (?:
+                  (?:\b(?<!'')([\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)\b(?!'))
+                 |(?:\(\s*(?!--+\))([\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)\s*\))
+                )
+            captures:
+              '1': {name: "keyword.other.safety.$1.bh"}
+              '2': 
+                name: entity.name.foreign.bh
+                patterns:
+                  - include: '#string_literal'
+              '3': {name: entity.name.function.bh}
+              '4': {name: entity.name.function.infix.bh}
+          # Assume that if there is no function name on this line, it will appear on the next line
+          - match: |
+              (?x)
+                \b(?<!')(safe|unsafe|interruptible)\b(?!')
+                \s*
+                ("(?:\\"|[^"])*")?
+                \s*$
+            captures:
+              '1': {name: "keyword.other.safety.$1.bh"}
+              '2': 
+                name: entity.name.foreign.bh
+                patterns:
+                  - include: '#string_literal'
+          - match: >-
+              (?x)
+                "(?:\\"|[^"])*"
+            captures:
+              '0': 
+                name: entity.name.foreign.bh
+                patterns:
+                  - include: '#string_literal'
+          - match: |
+              (?x)
+                 (?:\b(?<!'')([\p{Ll}_][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*)\b(?!'))
+                |(?:(\()\s*(?!--+\))([\p{S}\p{P}&&[^(),;\[\]`{}_"']]+)\s*(\)))
+            captures:
+              '1': {name: entity.name.function.bh}
+              '2': {name: punctuation.paren.bh}
+              '3': {name: entity.name.function.infix.bh}
+              '4': {name: punctuation.paren.bh}
+      - include: '#double_colon'
+      - include: '#type_signature'
+  inline_phase:
+    begin: '\['
+    beginCaptures:
+      '0': {name: punctuation.bracket.bh}
+    end: '\]'
+    endCaptures:
+      '0': {name: punctuation.bracket.bh}
+    name: meta.inlining-phase.bh
+    patterns:
+      - match: '~'
+        name: punctuation.tilde.bh
+      - include: '#integer_literals'
+      - match: '\w*'
+        name: invalid
+  quasi_quote:
+    patterns:
+      - begin: >-
+          (?x)
+            (\[)
+            (e|d|p)?
+            (\|(?:\|(?!\]))?)
+        beginCaptures:
+          '1': {name: keyword.operator.quasi-quotation.begin.bh}
+          '2': {name: entity.name.quasi-quoter.bh}
+          '3': {name: keyword.operator.quasi-quotation.begin.bh}
+        end: '\3\]'
+        endCaptures:
+          '0': {name: keyword.operator.quasi-quotation.end.bh}
+        name: meta.quasi-quotation.bh
+        patterns:
+          - include: '$self'
+      - begin: >-
+          (?x)
+            (\[)
+            (t)
+            (\|(?:\|(?!\]))?)
+        beginCaptures:
+          '1': {name: keyword.operator.quasi-quotation.begin.bh}
+          '2': {name: entity.name.quasi-quoter.bh}
+          '3': {name: keyword.operator.quasi-quotation.begin.bh}
+        end: '\3\]'
+        endCaptures:
+          '0': {name: keyword.operator.quasi-quotation.end.bh}
+        name: meta.quasi-quotation.bh
+        patterns:
+          - include: '#type_signature'
+      - begin: >-
+          (?x)
+            (\[)
+            (?:(\$\$)|(\$))?
+            (?!'\|')                                             # Don't parse ['|'...] as a quasi quotation
+            ((?:[\p{Lu}\p{Lt}][\p{Ll}_\p{Lu}\p{Lt}\p{Nd}']*\.)*) # Optional qualifier
+            ((?:[^\s\p{S}\p{P}]|['_])*)                          # Quasi-quoter
+            (\|)
+        beginCaptures:
+          '1': {name: keyword.operator.quasi-quotation.begin.bh}
+          '2': {name: keyword.operator.prefix.double-dollar.bh}
+          '3': {name: keyword.operator.prefix.dollar.bh}
+          '4': {name: entity.name.namespace.bh}
+          '5': {name: entity.name.quasi-quoter.bh}
+          '6': {name: keyword.operator.quasi-quotation.begin.bh}
+        end: '\|\]'
+        endCaptures:
+          '0': {name: keyword.operator.quasi-quotation.end.bh}
+        name: "meta.quasi-quotation.bh meta.embedded.block.$5"
+scopeName: source.bh
+uuid: CEA83430-64E4-451D-9213-2CFB1BB90BFD
