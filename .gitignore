@@ -1,1 +1,4 @@
 syntaxes/bh.json
+out/*
+language-bh*.vsix
+node_modules/*
