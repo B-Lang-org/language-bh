@@ -51,9 +51,10 @@ patterns:
       - match: '[a-z]+'
         name: invalid
   - include: '#ffi'
-  - begin: '^(\s*)(class)(\s*coherent)?(\b(?!''))'
+  - begin: '^(\s*)(class)(\s+(:?in?)coherent)?(\b(?!''))'
     beginCaptures:
       '2': {name: keyword.other.class.bh}
+      '3': {name: keyword.other.coherent.bh}
     end: >-
       (?x) # Detect end of class declaration:
                # 'where' keyword
@@ -75,74 +76,6 @@ patterns:
       - include: '#comment_like'
       - include: '#where'
       - include: '#type_signature'
-  # GADT declaration
-  # must find `where` keyword on the same line
-  # (only way to distinguish between GADT and ADT)
-  - begin: >-
-      (?x)
-        ^(\s*)(data|newtype)(?:\s+(instance))?\s+
-        # Keep consuming characters until:
-        ((?:(?!
-        # the equals symbol or the start of a single-line comment, or
-          (?: 
-            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
-            (?:=|--+)
-            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
-          )
-        # the "where" or "deriving" keywords, or
-        | (?:\b(?<!')(?:where|deriving)\b(?!'))
-        # the start of a block comment.
-        | {-
-        #
-        ).)*)
-        (?=\b(?<!'')where\b(?!''))
-    beginCaptures:
-      '2': {name: keyword.other.$2.bh}
-      '3': {name: keyword.other.instance.bh}
-      '4': 
-        patterns:
-          - include: '#type_signature'
-    name: meta.declaration.$2.generalized.bh
-    end: | 
-      (?x) # Detect end of data declaration:
-               # Deriving clause
-         (?=(?<!')\bderiving\b(?!'))  
-               # Decreasing indentation
-         |(?=\}|;)      # Explicit indentation
-         |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
-             \1\s+\S    # - more indented, or
-           | \s*        # - starts with whitespace, followed by:
-             (?: $      #   - the end of the line (i.e. empty line), or
-             |\{-[^@]   #   - the start of a block comment, or
-             |--+       #   - the start of a single-line comment.
-                (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
-                        # The double dash may not be followed by other operator characters
-                        # (then it would be an operator, not a comment)
-           )
-    patterns:
-      - include: '#comment_like'
-      # Can't simply include 'where' pattern,
-      # because it includes all of $self,
-      # whereas we want something slightly different
-      - begin: >-
-          (?x)
-            (?<!')\b(where)
-            \s*(\{)(?!-)
-        end: '\}'
-        beginCaptures:
-          '1': {name: keyword.other.where.bh}
-          '2': {name: punctuation.brace.bh}
-        endCaptures:
-          '1': {name: punctuation.brace.bh}
-        patterns:
-          - include: '#comment_like'
-          - include: '#gadt_constructor'
-          - match: ';'
-            name: punctuation.semicolon.bh
-      - match: '\b(?<!'')(where)\b(?!'')'
-        name: keyword.other.where.bh
-      - include: '#deriving'
-      - include: '#gadt_constructor'
   - include: '#role_annotation'
   - name: 'meta.declaration.pattern.type.bh'
     begin: '^(\s*)(pattern)\s+(.*?)\s+(::|∷)(?![\p{S}\p{P}&&[^(),;\[\]`{}_"'']])'
@@ -191,7 +124,7 @@ patterns:
   - begin: >-
       (?x)
         # Data declaration
-        ^(\s*)(data|newtype)(?:\s+(family|instance))?\s+
+        ^(\s*)(data|newtype|interface|struct)\s+
         # Keep consuming characters until:
         (((?!
         # the equals symbol or the start of a single-line comment, or
@@ -234,50 +167,6 @@ patterns:
       - include: '#adt_constructor'
       - include: '#data_context'
       - include: '#record_decl'
-      - include: '#type_signature'
-  - name: 'meta.declaration.type.family.bh'
-    begin: >-
-      (?x)
-        # Type family
-        ^(\s*)(type)\s+(family)\b(?!')
-        # Keep consuming characters until:
-        (((?!
-        # the equals symbol or the start of a single-line comment, or
-          (?: 
-            (?<![\p{S}\p{P}&&[^(),;\[\]`{}_"']]) # non-symbol
-            (?:=|--+)
-            (?![\p{S}\p{P}&&[^(),;\[\]`{}_"']])  # non-symbol
-          )
-        # the "where" keyword, or
-        | \b(?<!')where\b(?!')
-        # the start of a block comment.
-        | {-
-        #
-        ).)*)
-    beginCaptures:
-      '2': {name: keyword.other.type.bh}
-      '3': {name: keyword.other.family.bh}
-      '4':
-        patterns:
-          - include: "#comment_like"
-          - include: '#where'
-          - include: '#type_signature'
-    end: | 
-      (?x) # Detect end of type family by decreasing indentation:
-        (?=\}|;)       # Explicit indentation
-        |^(?!          # Implicit indentation: end match on newline *unless* the new line is either:
-            \1\s+\S    # - more indented, or
-          | \s*        # - starts with whitespace, followed by:
-            (?: $      #   - the end of the line (i.e. empty line), or
-            |\{-[^@]   #   - the start of a block comment, or
-            |--+       #   - the start of a single-line comment.
-               (?![\p{S}\p{P}&&[^(),;\[\]{}`_"']]).*$) # non-symbol
-                       # The double dash may not be followed by other operator characters
-                       # (then it would be an operator, not a comment)
-          )
-    patterns:
-      - include: "#comment_like"
-      - include: '#where'
       - include: '#type_signature'
   - name: 'meta.declaration.type.bh'
     begin: >-
@@ -480,7 +369,7 @@ repository:
   cpp:
     captures:
       '1': {name: punctuation.definition.preprocessor.c}
-    comment: 'In addition to bh''s "native" syntax, GHC permits the C preprocessor to be run on a source file.'
+    comment: 'In addition to bh''s "native" syntax, bsc permits the C preprocessor to be run on a source file.'
     match: '^(#).*$' # `#` must be the first character on the line
     name: meta.preprocessor.c
   where:
@@ -504,7 +393,7 @@ repository:
   layout_herald:
     begin: >-
       (?x)
-        (?:(?<!')\b(?:(where|let|m?do)|(of))|(\\\s*case(?:s)?))
+        (?:(?<!')\b(?:(where|let|letseq|do|module|rules|action)|(of))|(\\\s*case(?:s)?))
         \s*(\{)(?!-)
     end: '(\})'
     beginCaptures:
@@ -519,7 +408,7 @@ repository:
       - match: ';'
         name: punctuation.semicolon.bh
   keyword:
-    match: '\b(?<!'')(?:(where|let|in|default)|(m?do|if|then|else|case(?:s)?|of|proc|rec))\b(?!'')'
+    match: '\b(?<!'')(?:(where|when|let|letseq|in)|(do|module|rules|action|if|then|else|case(?:s)?|of|verilog|synthesize))\b(?!'')'
     captures:
       '1': {name: keyword.other.$1.bh}
       '2': {name: keyword.control.$2.bh}
@@ -703,81 +592,16 @@ repository:
     name: meta.preprocessor.bh
     patterns:
       - include: '#comments'
-      # LANGUAGE extensions (as of GHC 8.10)
-      - begin: >-
-          (?xi)
-          \b(?<!')(LANGUAGE)\b(?!')
-        end: '(?=#-\})'
-        beginCaptures:
-          '1': {name: keyword.other.preprocessor.pragma.bh}
-        patterns:
-          - include: '#comments'
-          - match: >-
-              (?x)
-                \b(?<!')
-                (?:No)?
-                (?:AutoDeriveTypeable|DatatypeContexts|DoRec|IncoherentInstances|MonadFailDesugaring|MonoPatBinds|NullaryTypeClasses|OverlappingInstances|PatternSignatures|RecordPuns|RelaxedPolyRec)
-                \b(?!')
-            name: invalid.deprecated
-          - match: >-
-              (?x)
-                \b(?<!')
-                (
-                (?:No)?
-                (?:AllowAmbiguousTypes|AlternativeLayoutRuleTransitional|AlternativeLayoutRule|Arrows|BangPatterns|BinaryLiterals|CApiFFI|CPP|CUSKs|ConstrainedClassMethods|ConstraintKinds|DataKinds|DefaultSignatures|DeriveAnyClass|DeriveDataTypeable|DeriveFoldable|DeriveFunctor|DeriveGeneric|DeriveLift|DeriveTraversable|DerivingStrategies|DerivingVia|DisambiguateRecordFields|DoAndIfThenElse|BlockArguments|DuplicateRecordFields|EmptyCase|EmptyDataDecls|EmptyDataDeriving|ExistentialQuantification|ExplicitForAll|ExplicitNamespaces|ExtendedDefaultRules|FlexibleContexts|FlexibleInstances|ForeignFunctionInterface|FunctionalDependencies|GADTSyntax|GADTs|GHCForeignImportPrim|Generali(?:s|z)edNewtypeDeriving|ImplicitParams|ImplicitPrelude|ImportQualifiedPost|ImpredicativeTypes|TypeFamilyDependencies|InstanceSigs|ApplicativeDo|InterruptibleFFI|JavaScriptFFI|KindSignatures|LambdaCase|LexicalNegation|LiberalTypeSynonyms|LinearTypes|MagicHash|MonadComprehensions|MonoLocalBinds|MonomorphismRestriction|MultiParamTypeClasses|MultiWayIf|NumericUnderscores|NPlusKPatterns|NamedFieldPuns|NamedWildCards|NegativeLiterals|HexFloatLiterals|NondecreasingIndentation|NumDecimals|OverloadedLabels|OverloadedLists|OverloadedStrings|PackageImports|ParallelArrays|ParallelListComp|PartialTypeSignatures|PatternGuards|PatternSynonyms|PolyKinds|PolymorphicComponents|QualifiedDo|QuantifiedConstraints|PostfixOperators|QuasiQuotes|Rank2Types|RankNTypes|RebindableSyntax|RecordWildCards|RecursiveDo|RelaxedLayout|RoleAnnotations|ScopedTypeVariables|StandaloneDeriving|StarIsType|StaticPointers|StrictData|Strict|TemplatebhQuotes|Templatebh|StandaloneKindSignatures|TraditionalRecordSyntax|TransformListComp|TupleSections|TypeApplications|TypeInType|TypeFamilies|TypeOperators|TypeSynonymInstances|UnboxedTuples|UnboxedSums|UndecidableInstances|UndecidableSuperClasses|UnicodeSyntax|UnliftedFFITypes|UnliftedNewtypes|ViewPatterns|UnliftedDatatypes|OverloadedRecordDot|OverloadedRecordUpdate|FieldSelectors)
-                )
-                \b(?!')
-            captures:
-              '1': {name: keyword.other.preprocessor.extension.bh}
-          - include: '#comma'
-      - begin: >-
-          (?xi)
-            \b(?<!')(SPECIALI(?:S|Z)E)
-            (?:
-            \s*( \[ [^\[\]]* \])?\s*
-            |\s+
-            )
-            (instance)\b(?!')
-        end: '(?=#-\})'
-        beginCaptures:
-          '1': {name: keyword.other.preprocessor.pragma.bh}
-          '2':
-            patterns:
-              - include: '#inline_phase'
-          '3': {name: keyword.other.instance.bh}
-        patterns:
-          - include: '#type_signature'
-      - begin: >-
-          (?xi)
-            \b(?<!')(SPECIALI(?:S|Z)E)\b(?!')
-            (?:\s+(INLINE)\b(?!'))?
-            (?:\s*(\[ [^\[\]]* \])?)
-            \s*
-        end: '(?=#-\})'
-        beginCaptures:
-          '1': {name: keyword.other.preprocessor.pragma.bh}
-          '2': {name: keyword.other.preprocessor.pragma.bh}
-          '3':
-            patterns:
-              - include: '#inline_phase'
-        patterns:
-          - include: '$self'
       - match: >-
           (?xi)
           \b(?<!')
-            (LANGUAGE|OPTIONS_GHC|OPTIONS_HADDOCK|OPTIONS|INCLUDE
-            |MINIMAL|UNPACK|OVERLAPS|INCOHERENT
-            |NOUNPACK|SOURCE|OVERLAPPING|OVERLAPPABLE|INLINE
-            |NOINLINE|INLINE?ABLE|CONLIKE|LINE|COLUMN|RULES
-            |COMPLETE)\b(?!')
-        name: keyword.other.preprocessor.bh
-      - begin: '(?i)\b(DEPRECATED|WARNING)\b'
-        beginCaptures:
-          '1': {name: keyword.other.preprocessor.pragma.bh}
-        end: '(?=#-\})'
-        patterns:
-          - include: '#comments'
-          - include: '#string_literal'
+            (synthesize|verilog|noReady|alwaysEnabled|parameter|no_default_clock|no_default_reset|gate_input_clocks|clock_family|clock_prefix|gate_prefix|reset_prefix|alwaysReady|noReady|alwaysEnabled|scanInsert|bitBlast|CLK|RSTN|options|deprecate|properties)\b(?!')
+        name: keyword.other.preprocessor.pragma.bh
+      - match: >-
+          (?xi)
+          \b(?<!')
+            (prefixs?|arg_names|ready|enable|result|always_ready|always_enabled)\b(?!')
+        name: keyword.other.preprocessor.pragma.bh
   data_context:
     match: |
       (?x)
@@ -957,6 +781,8 @@ repository:
         )
         \s*(?<![\p{S}\p{P}&&[^\),;\]`}_"']])(::|∷)(?![\p{S}\p{P}&&[^\(,;\[`{_"']])
     beginCaptures:
+      '2': {name: keyword.other.primitive.bh}
+      '3': {name: keyword.other.type.bh}
       '4':
         name: entity.name.function.bh
         patterns:
