@@ -2,7 +2,7 @@
   "name": "language-bh",
   "displayName": "Bluespec Classic Syntax Highlighting",
   "description": "Syntax support for Bluespec Classic.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "bthom",
   "engines": {
     "vscode": "^1.81.0"
