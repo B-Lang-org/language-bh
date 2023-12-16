@@ -12,6 +12,9 @@ grammars: $(JSON_TARGETS)
 %.json: %.YAML-tmLanguage
 	$(CONVERT) $< > $@
 
+test: grammars
+	cd test && bash test.sh
+
 publish: all
 	$(VSCE) publish
 

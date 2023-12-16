@@ -64,7 +64,7 @@
       }
     ]
   },
-  "scripts":  {
+  "scripts": {
     "compile": "tsc -p ./",
     "esbuild": "rimraf out && esbuild ./src/extension.ts --bundle --minify --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
     "lint": "eslint . --ext .ts,.tsx",
@@ -85,7 +85,7 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-import-resolver-typescript": "^3.6.0",
     "eslint-plugin-import": "^2.28.1",
-    "typescript": "^5.2.2",
-    "rimraf": "^5.0.1"
+    "rimraf": "^5.0.1",
+    "typescript": "^5.2.2"
   }
 }

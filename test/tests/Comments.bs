@@ -1,0 +1,22 @@
+-- SYNTAX TEST "source.bh" "Intervening comments shouldn't affect highlighting"
+package Comments where
+
+  data A
+--     ^ storage.type.bh
+  -- comment line not gobbled up by the preprocessor
+-- <~~-------------------------------------------------- comment.line.double-dash.bh
+    = A
+--    ^ constant.other.bh
+
+  toActionValue_ :: (Bits a n) =>
+  -- comment line not gobbled up by the preprocessor
+-- <~~-------------------------------------------------- comment.line.double-dash.bh
+      ActionValue a -> ActionValue_ n
+--    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ meta.function.type-declaration.bh
+--                     ^^^^^^^^^^^^ storage.type.bh
+  
+  type T a
+  -- comment line not gobbled up by the preprocessor
+-- <~~-------------------------------------------------- comment.line.double-dash.bh
+    = Bool
+--    ^^^^ storage.type.bh
