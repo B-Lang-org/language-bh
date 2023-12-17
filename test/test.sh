@@ -4,11 +4,13 @@ baseDir=$(dirname "$PWD")
 echo "Running tests from base directory $baseDir"
 
 # Arrays containing full test filepaths.
-named=("$PWD"/tests/*)
+named=("$PWD"/tests/*.bs)
+libs=("$PWD"/libs/*.bs)
 #tickets=("$PWD"/tickets/*)
 
 # Arrays containing filenames of broken tests.
 namedBroken=()
+libsBroken=()
 #ticketsBroken=(
 #  "T0001.hs"
 #  "T0002.hs"
@@ -42,15 +44,12 @@ fi
 #   -> ST s ExitCode     -- ^ Exit code: 0 if no unexpected outcomes, 1 otherwise.
 runTests () {
 
-  local dir=$1
-  local expectedFails=$2
-  # This function also expects the following to be globally available
-  #   unexpectedFails
-  #   unexpectedPasses
-  # They could be defined with "local -n" but older bash does not support it
+  local -n dir=$1
+  local -n expectedFails=$2
+  local -n fails=$3
+  local -n passes=$4
 
   syntaxes=()
-  source=""
 
   for filepath in "${dir[@]}"
   do
@@ -90,9 +89,18 @@ runTests () {
         specifySyntaxes="$specifySyntaxes -g $i"
       done
       # Run the test.
+      #  If a .snap file exists, it's a snapshot test;
+      #    otherwise, it's an ordinary test
       #  The --no option avoids hanging at an invisible prompt if the package
-      #  has not been installed, in case the install above failed
-      result=$(npx --no -- vscode-tmgrammar-test $specifySyntaxes "$filepath")
+      #    has not been installed, in case the install above failed
+      if [ -f "${filepath}.snap" ] ; then
+	  # The tool can't seem to identify the scope unless either --scope or --config
+	  # is specified (or if run in the directory containing "package.json")
+	  specifyConfig="--config $baseDir/package.json"
+          result=$(npx --no -- vscode-tmgrammar-snap $specifyConfig $specifySyntaxes "$filepath") ;
+      else
+          result=$(npx --no -- vscode-tmgrammar-test $specifySyntaxes "$filepath") ;
+      fi
       # Check test result by inspecting the exit code of the previous command.
       status=$?
       if [ $status -eq 0 ]
@@ -101,13 +109,13 @@ runTests () {
         then
           echo -e "${GREEN}Pass   (expected)${NC} $file"
         else
-          unexpectedPasses+=("$name")
+          passes+=("$name")
           echo -e "${MAGENTA}Pass (unexpected)${NC} $file"
         fi
       else
         if [ $expectBroken -eq 0 ]
         then
-          unexpectedFails+=("$name")
+          fails+=("$name")
           echo -e "${RED}Fail (unexpected)${NC} $file"
           echo -e "$result"
         else
@@ -123,9 +131,11 @@ unexpectedFails=()
 unexpectedPasses=()
 
 # Run the named tests (in the 'tests' folder).
-runTests ${named} ${namedBroken}
+runTests named namedBroken unexpectedFails unexpectedPasses
+# Run the library tests (in the 'libs' folder).
+runTests libs libsBroken unexpectedFails unexpectedPasses
 # Run the ticket tests (in the 'tickets' folder).
-#runTests ${tickets} ${ticketsBroken}
+#runTests tickets ticketsBroken unexpectedFails unexpectedPasses
 
 # Return the appropriate exit code.
 if [ ${#unexpectedFails[@]} -eq 0 ] && [ ${#unexpectedPasses[@]} -eq 0 ]
