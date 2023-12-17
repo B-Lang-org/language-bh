@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
-        run: npm install -g js-yaml vscode-tmgrammar-test
+        run: npm ci
       - name: Generate grammar JSON files
         run: make grammars
       - name: Run tests

@@ -22,21 +22,13 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 # Test if 'vscode-tmgrammar-test' is installed in npx
-# and install if necessary, with a message to the user
-#   This could be replaced by simply passing --yes to npx in runTests()
-#   but then the user is not informed that the script has installed it
+# and error early if not, with a message to use the "package*.json" files
 npx --no -- vscode-tmgrammar-test -h > /dev/null 2>&1
 status=$?
 if [ $status -ne 0 ]
 then
-    echo "NOTE: Installing npx package 'vscode-tmgrammar-test'"
-    npx --yes -- vscode-tmgrammar-test -h > /dev/null 2>&1
-    status=$?
-    if [ $status -ne 0 ]
-    then
-	echo "ERROR: Unable to install 'vscode-tmgrammar-test'"
-	exit 1
-    fi
+    echo -e "ERROR: Package 'vscode-tmgrammar-test' not installed, run \"npm ci\" or \"npm install\""
+    exit 1
 fi
 
 # 'runTests' runs the 'vscode-tmgrammar-test' command on all test files in a directory,
