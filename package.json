@@ -3,9 +3,9 @@
   "displayName": "Bluespec Classic Syntax Highlighting",
   "description": "Syntax support for Bluespec Classic.",
   "version": "0.0.2",
-  "publisher": "bthom",
+  "publisher": "B-Lang-org",
   "engines": {
-    "vscode": "^1.81.0"
+    "vscode": "^1.0.0"
   },
   "files": [
     "src/*",
@@ -21,10 +21,10 @@
     "syntax"
   ],
   "license": "BSD-3-Clause",
-  "homepage": "https://github.com/VCA-EPFL/language-bh",
+  "homepage": "https://github.com/B-Lang-org/language-bh",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VCA-EPFL/language-bh.git"
+    "url": "https://github.com/B-Lang-org/language-bh.git"
   },
   "activationEvents": [
     "onLanguage:bh"
@@ -75,7 +75,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.5.6",
-    "@types/vscode": "^1.81.0",
+    "@types/vscode": "^1.0.0",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
     "@typescript-eslint/parser": "^6.4.1",
     "@vscode/vsce": "^2.20.1",
