@@ -1,12 +1,12 @@
 # Bluespec Classic Highlighting Support
-This mode adapts the Haskell textmate grammar to Bluespec Classic to provide Bluespec Classis syntax highlighting in Visual Studio Code.
+This mode adapts the Haskell textmate grammar to Bluespec Classic to provide Bluespec Classic syntax highlighting in Visual Studio Code.
 
 The extension is derived from <https://github.com/JustusAdam/language-haskell>
 
 
 ## Syntax highlighting
 
-Adds syntax highlighting support for Bluespec Classic (.bs).
+Adds syntax highlighting support for Bluespec Classic (`.bs`).
 Also adds automatic indentation after `where`, `do`, `->` etc. and surrounding brackets (`[]`, `{}` etc)
 
 ![Screenshot Bluespec Classic](/images/screenshot.png?raw=true)
