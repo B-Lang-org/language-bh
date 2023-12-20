@@ -7,10 +7,17 @@
   "engines": {
     "vscode": "^1.0.0"
   },
+  "icon": "images/B-Lang.png",
+  "galleryBanner": {
+    "color": "#12223c",
+    "theme": "dark"
+  },
   "files": [
     "src/*",
     "syntaxes/*.json",
+    "images/",
     "README.md",
+    "LICENSE",
     "*-configuration.json",
     "tsconfig.json"
   ],
@@ -26,6 +33,12 @@
     "type": "git",
     "url": "https://github.com/B-Lang-org/language-bh.git"
   },
+  "bugs": {
+    "url": "https://github.com/B-Lang-org/language-bh/issues"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "activationEvents": [
     "onLanguage:bh"
   ],
@@ -48,6 +61,8 @@
         "aliases": [
           "Bluespec Classic",
           "Bluespec Haskell",
+          "Bluespec BH",
+          "BH",
           "bh"
         ],
         "extensions": [
